@@ -42,34 +42,35 @@ public class Main {
     private static final int GRPC_PORT = 9999;
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        Duration grpcCallTimeout = Duration.ofMillis(100);
-        Duration callFrequency = Duration.ofMillis(100);
+        Duration grpcCallTimeout = Duration.ofSeconds(1);
+        Duration callFrequency = Duration.ofSeconds(1);
 
         try (TestRunner testRunner = new TestRunner(GRPC_PORT, grpcCallTimeout)) {
             // start grpc server
             try (TestServer server = new TestServer(GRPC_PORT)) {
                 server.start();
 
-                // start thread with grpc calls every 100ms
+                // start thread with grpc calls every 1s
                 testRunner.run(callFrequency);
 
-                // wait for first 10 success grpc calls
-                log.info("Wait for 10 success calls");
-                testRunner.awaitSuccessCalls(10, Duration.ofSeconds(15));
+                // wait for first 2 success grpc calls
+                log.info("Wait for 2 success calls");
+                testRunner.awaitSuccessCalls(2, Duration.ofSeconds(15));
 
                 // shutdown grpc server for emulate server unavailable
                 log.info("Server goes away");
             }
 
-            // wait for 1 second, before restart server
-            // emulate 1 second server unavailable
-            TimeUnit.SECONDS.sleep(1);
+            // wait for 2 second, before restart server
+            // emulate 2 second server unavailable
+            // this sleep duration must be greater than deadline of grpc call
+            TimeUnit.SECONDS.sleep(2);
 
             try (TestServer server = new TestServer(GRPC_PORT)) {
                 server.start();
 
-                // wait for next 10 success calls
-                testRunner.awaitSuccessCalls(100, Duration.ofSeconds(15));
+                // wait for next 2 success calls
+                testRunner.awaitSuccessCalls(2, Duration.ofSeconds(15));
             }
         }
 
