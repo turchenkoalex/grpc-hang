@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package com.example;
+
+option optimize_for = SPEED;
+option java_outer_classname = "ExampleProto";
+
+service ExampleService {
+  rpc unaryCall(Req) returns (Resp);
+}
+
+message Req {
+  optional int32 num = 1;
+}
+
+message Resp {
+  optional int32 num = 1;
+}
+
