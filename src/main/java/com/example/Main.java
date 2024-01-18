@@ -1,8 +1,8 @@
 package com.example;
 
-import java.io.IOException;
 import java.time.Duration;
-import java.util.concurrent.TimeUnit;
+import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
 /**
@@ -13,24 +13,17 @@ import java.util.logging.Logger;
  * <pre>
  * Hanged thread stack
  *
- * "pool-1-thread-1" #22 [29443] prio=5 os_prio=31 cpu=34.13ms elapsed=34.56s tid=0x00000001408fd000 nid=29443 waiting on condition  [0x0000000171c4e000]
+ *"main" #1 [8707] prio=5 os_prio=31 cpu=207.44ms elapsed=16.32s tid=0x0000000132808200 nid=8707 waiting on condition  [0x000000016fcda000]
  *    java.lang.Thread.State: WAITING (parking)
  * 	at jdk.internal.misc.Unsafe.park(java.base@21.0.1/Native Method)
- * 	- parking to wait for  <0x000000061f08eb00> (a io.grpc.stub.ClientCalls$ThreadlessExecutor)
+ * 	- parking to wait for  <0x000000061e400010> (a io.grpc.stub.ClientCalls$ThreadlessExecutor)
  * 	at java.util.concurrent.locks.LockSupport.park(java.base@21.0.1/LockSupport.java:221)
  * 	at io.grpc.stub.ClientCalls$ThreadlessExecutor.waitAndDrain(ClientCalls.java:717)
  * 	at io.grpc.stub.ClientCalls.blockingUnaryCall(ClientCalls.java:159)
  * 	at com.example.ExampleServiceGrpc$ExampleServiceBlockingStub.unaryCall(ExampleServiceGrpc.java:160)
- * 	at com.example.TestClient.call(TestClient.java:63)
- * 	at com.example.TestRunner.lambda$run$0(TestRunner.java:20)
- * 	at com.example.TestRunner$$Lambda/0x00000070010e9dd8.run(Unknown Source)
- * 	at java.util.concurrent.Executors$RunnableAdapter.call(java.base@21.0.1/Executors.java:572)
- * 	at java.util.concurrent.FutureTask.runAndReset(java.base@21.0.1/FutureTask.java:358)
- * 	at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(java.base@21.0.1/ScheduledThreadPoolExecutor.java:305)
- * 	at java.util.concurrent.ThreadPoolExecutor.runWorker(java.base@21.0.1/ThreadPoolExecutor.java:1144)
- * 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(java.base@21.0.1/ThreadPoolExecutor.java:642)
- * 	at java.lang.Thread.runWith(java.base@21.0.1/Thread.java:1596)
- * 	at java.lang.Thread.run(java.base@21.0.1/Thread.java:1583)
+ * 	at com.example.TestClient.call(TestClient.java:70)
+ * 	at com.example.TestClient.callWithError(TestClient.java:53)
+ * 	at com.example.Main.main(Main.java:52)
  * </pre>
  *
  * @see TestClient To configure the client
@@ -41,40 +34,38 @@ public class Main {
 
     private static final int GRPC_PORT = 9999;
 
-    public static void main(String[] args) throws IOException, InterruptedException {
-        Duration grpcCallTimeout = Duration.ofSeconds(1);
-        Duration callFrequency = Duration.ofSeconds(1);
+    public static void main(String[] args) {
+        final boolean retires = true;
 
-        try (TestRunner testRunner = new TestRunner(GRPC_PORT, grpcCallTimeout)) {
-            // start grpc server
-            try (TestServer server = new TestServer(GRPC_PORT)) {
-                server.start();
+        // Backoff + ..., for reproducing bug must be less than all retries deadline (5 * backoff)
+        Duration deadline = Duration.ofSeconds(1);
+        Map<String, ?> serviceConfig = Map.of("methodConfig",
+                List.of(
+                        Map.of(
+                                "name", List.of(Map.of()),
+                                "retryPolicy", Map.of(
+                                        "maxAttempts", 4D,
+                                        "initialBackoff", "10s",
+                                        "maxBackoff", "10s",
+                                        "backoffMultiplier", 1D,
+                                        "retryableStatusCodes", List.of("UNKNOWN")
+                                )
+                        )
+                )
+        );
 
-                // start thread with grpc calls every 1s
-                testRunner.run(callFrequency);
+        TestClient client = new TestClient(GRPC_PORT, deadline, retires, serviceConfig);
 
-                // wait for first 2 success grpc calls
-                log.info("Wait for 2 success calls");
-                testRunner.awaitSuccessCalls(2, Duration.ofSeconds(15));
+        try (TestServer ignored = new TestServer(GRPC_PORT)) {
 
-                // shutdown grpc server for emulate server unavailable
-                log.info("Server goes away");
-            }
+            // Test success call, no retries
+            client.callWithOK();
 
-            // wait for 2 second, before restart server
-            // emulate 2 second server unavailable
-            // this sleep duration must be greater than deadline of grpc call
-            TimeUnit.SECONDS.sleep(2);
+            // hang on this client call, retry occurs
+            client.callWithError();
 
-            try (TestServer server = new TestServer(GRPC_PORT)) {
-                server.start();
-
-                // wait for next 2 success calls
-                testRunner.awaitSuccessCalls(2, Duration.ofSeconds(15));
-            }
+            // Never happens if bug present (reties + deadline configuration)
+            log.info("Test done");
         }
-
-        // if bug happens, this line never called
-        log.info("Test is OK");
     }
 }

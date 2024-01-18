@@ -15,20 +15,22 @@ public class TestServer implements AutoCloseable {
         server = ServerBuilder.forPort(port)
                 .addService(new ExampleServiceImpl())
                 .build();
-    }
 
-    public void start() throws IOException {
-        server.start();
-        log.info("Server started at *:" + server.getPort());
+        try {
+            server.start();
+            log.info("Server started at *:" + server.getPort());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
     public void close() {
-        log.info("Server shutdown");
+        log.info("Server stop");
         server.shutdown();
         try {
             server.awaitTermination();
-            log.info("Server shutdown done");
+            log.info("Server stopped");
         } catch (InterruptedException ignore) {
             // nothing to do
         }

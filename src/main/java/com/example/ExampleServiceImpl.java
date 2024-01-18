@@ -1,5 +1,6 @@
 package com.example;
 
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 
 import java.util.logging.Logger;
@@ -9,13 +10,16 @@ public class ExampleServiceImpl extends ExampleServiceGrpc.ExampleServiceImplBas
 
     @Override
     public void unaryCall(ExampleProto.Req request, StreamObserver<ExampleProto.Resp> responseObserver) {
-        log.info("RCVD "+ request.getNum());
+        log.info("Server: Received returnError:" + request.getReturnError());
 
-        ExampleProto.Resp resp = ExampleProto.Resp.newBuilder()
-                .setNum(request.getNum())
-                .build();
+        if (request.getReturnError()) {
+            log.info("Server: Response status UNKNOWN");
+            responseObserver.onError(Status.UNKNOWN.asRuntimeException());
+            return;
+        }
 
-        responseObserver.onNext(resp);
+        log.info("Server: Response status OK");
+        responseObserver.onNext(ExampleProto.Resp.newBuilder().build());
         responseObserver.onCompleted();
     }
 }
