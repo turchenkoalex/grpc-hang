@@ -7,9 +7,8 @@ import java.util.concurrent.*;
 import java.util.logging.Logger;
 
 /**
- * This test shows a hang error on a blocking grpc call if the client uses the retry policy and uses a deadline
- * Retry policy described in TestClient class.
- *
+ * This app shows a hang of a blocking grpc call if the client uses the retry policy and uses a deadline
+ * Retry policy described in test method.
  *
  * <pre>
  * Hanged thread stack
@@ -46,7 +45,7 @@ public class Main {
             try {
                 future.get(30, TimeUnit.SECONDS);
             } catch (TimeoutException e) {
-                log.info("test hang, cancel it");
+                log.warning("test method hang, cancel it");
                 future.cancel(true);
             } catch (InterruptedException | ExecutionException e) {
                 throw new RuntimeException(e);
@@ -65,7 +64,7 @@ public class Main {
 
     private static void test() {
         final boolean enableRetry = true;
-        // Backoff + ..., for reproducing bug must be less than all retries deadline (5 * backoff)
+        // Deadline should occur at the time between the first call with an error and the next attempt of retry call
         Duration deadline = Duration.ofSeconds(1);
         Map<String, ?> serviceConfig = Map.of("methodConfig",
                 List.of(
@@ -85,11 +84,10 @@ public class Main {
         TestClient client = new TestClient(GRPC_PORT, deadline, enableRetry, serviceConfig);
 
         try (TestServer ignored = new TestServer(GRPC_PORT)) {
-
             // Test success call, no retries
             client.callWithOK();
 
-            // hang on this client call, retry occurs
+            // hang on this client call, retry occurs on error response
             client.callWithError();
 
             // Never happens if bug present (reties + deadline configuration)

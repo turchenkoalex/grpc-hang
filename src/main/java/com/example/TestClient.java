@@ -48,11 +48,11 @@ public class TestClient {
                 .build();
 
         try {
-            ExampleProto.Resp resp = blockingStub
+            ExampleProto.Resp ignore = blockingStub
                     .withDeadlineAfter(callTimeoutMillis, TimeUnit.MILLISECONDS)
                     .unaryCall(req);
 
-            log.info("Client: OK: " + resp);
+            log.info("Client: OK");
         } catch (Exception e) {
             log.log(Level.WARNING, "Client: call failure", e);
         }
