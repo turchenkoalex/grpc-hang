@@ -3,6 +3,7 @@ package com.example;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.*;
 import java.util.logging.Logger;
 
 /**
@@ -13,7 +14,7 @@ import java.util.logging.Logger;
  * <pre>
  * Hanged thread stack
  *
- *"main" #1 [8707] prio=5 os_prio=31 cpu=207.44ms elapsed=16.32s tid=0x0000000132808200 nid=8707 waiting on condition  [0x000000016fcda000]
+ * "main" #1 [8707] prio=5 os_prio=31 cpu=207.44ms elapsed=16.32s tid=0x0000000132808200 nid=8707 waiting on condition  [0x000000016fcda000]
  *    java.lang.Thread.State: WAITING (parking)
  * 	at jdk.internal.misc.Unsafe.park(java.base@21.0.1/Native Method)
  * 	- parking to wait for  <0x000000061e400010> (a io.grpc.stub.ClientCalls$ThreadlessExecutor)
@@ -34,9 +35,36 @@ public class Main {
 
     private static final int GRPC_PORT = 9999;
 
+    /**
+     * Look at test method
+     */
     public static void main(String[] args) {
-        final boolean retires = true;
+        final ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<?> future = executor.submit(Main::test);
 
+            try {
+                future.get(30, TimeUnit.SECONDS);
+            } catch (TimeoutException e) {
+                log.info("test hang, cancel it");
+                future.cancel(true);
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+
+            if (future.isCancelled()) {
+                log.info("Test FAIL");
+                System.exit(1);
+            } else {
+                log.info("Test OK");
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private static void test() {
+        final boolean enableRetry = true;
         // Backoff + ..., for reproducing bug must be less than all retries deadline (5 * backoff)
         Duration deadline = Duration.ofSeconds(1);
         Map<String, ?> serviceConfig = Map.of("methodConfig",
@@ -54,7 +82,7 @@ public class Main {
                 )
         );
 
-        TestClient client = new TestClient(GRPC_PORT, deadline, retires, serviceConfig);
+        TestClient client = new TestClient(GRPC_PORT, deadline, enableRetry, serviceConfig);
 
         try (TestServer ignored = new TestServer(GRPC_PORT)) {
 
@@ -65,7 +93,6 @@ public class Main {
             client.callWithError();
 
             // Never happens if bug present (reties + deadline configuration)
-            log.info("Test done");
         }
     }
 }

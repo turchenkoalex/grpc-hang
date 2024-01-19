@@ -14,14 +14,14 @@ public class TestClient {
     private final long callTimeoutMillis;
     private final ExampleServiceGrpc.ExampleServiceBlockingStub blockingStub;
 
-    public TestClient(int port, Duration callTimeout, boolean retries, Map<String, ?> serviceConfig) {
+    public TestClient(int port, Duration callTimeout, boolean enableRetry, Map<String, ?> serviceConfig) {
         callTimeoutMillis = callTimeout.toMillis();
         var builder = ManagedChannelBuilder.forAddress("localhost", port)
                 .usePlaintext()
                 .disableServiceConfigLookUp()
                 .defaultServiceConfig(serviceConfig);
 
-        if (retries) {
+        if (enableRetry) {
             builder.enableRetry();
         } else {
             builder.disableRetry();

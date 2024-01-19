@@ -4,6 +4,13 @@ plugins {
     id 'com.google.protobuf' version '0.9.4'
 }
 
+// Provide the grpcVersion property for testing purposes
+var grpcVersion = "$System.env.GRPC_VERSION"
+if (grpcVersion == "null" || grpcVersion.isEmpty()) {
+    // current version of grpc used by the project
+    grpcVersion = '1.61.0'
+}
+
 group = 'org.example'
 version = '1.0-SNAPSHOT'
 
@@ -25,7 +32,7 @@ protobuf {
     }
     plugins {
         grpc {
-            artifact = 'io.grpc:protoc-gen-grpc-java:1.61.0'
+            artifact = "io.grpc:protoc-gen-grpc-java:$grpcVersion"
         }
     }
     generateProtoTasks {
@@ -36,10 +43,8 @@ protobuf {
 }
 
 dependencies {
-    runtimeOnly 'io.grpc:grpc-netty-shaded:1.61.0'
-    implementation 'io.grpc:grpc-stub:1.61.0'
-
-
-    implementation 'io.grpc:grpc-protobuf:1.61.0'
+    runtimeOnly "io.grpc:grpc-netty-shaded:$grpcVersion"
+    implementation "io.grpc:grpc-stub:$grpcVersion"
+    implementation "io.grpc:grpc-protobuf:$grpcVersion"
     compileOnly 'org.apache.tomcat:annotations-api:6.0.53' // necessary for Java 9+
 }
